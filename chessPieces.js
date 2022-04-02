@@ -19,7 +19,11 @@ class ChessPiece {
 	}
 
 	getPiece() {
-		return "<img class='draggable' style='position: relative' src='" + this.image + "'>";
+		return "<img class='draggable no-select' src='" + this.image + "'>";
+	}
+	
+	getIcon() {
+		return "<img style='width: 20px;' src='" + this.image + "'>";
 	}
 }
 

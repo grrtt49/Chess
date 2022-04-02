@@ -1,3 +1,8 @@
+/* 
+TODO: 
+Check after pawn promotion
+*/
+
 class ChessBoard {
 	selector;
 	size;
@@ -6,6 +11,8 @@ class ChessBoard {
 	board;
 	turn;
 	showingPawnPromotion;
+	capturedPieces;
+	moves;
 	
 	constructor(selector, size, color1, color2) {
 	    this.selector = selector;
@@ -15,6 +22,8 @@ class ChessBoard {
 		this.board = this._initBoard();
 		this.turn = 0;
 		this.showingPawnPromotion = false;
+		this.capturedPieces = [];
+		this.moves = new MoveTranslator();
 	}
 
 	drawBoard() {
@@ -25,10 +34,62 @@ class ChessBoard {
 				$(this.selector).append(this._getSquare(x, y));
 			}
 		}
+		this.drawCaptured();
+		$("#move-container").html(this.moves.getHTML());
 		$(".draggable").draggable({
 			containment: $("#board"),
 			revert: true,
 			zIndex: 5000,
+		});
+	}
+
+	drawCaptured() {
+		$("#b-pieces-captured").empty();
+		$("#w-pieces-captured").empty();
+		let whitePieces = {
+			"queens": [],
+			"rooks": [],
+			"bishops": [],
+			"knights": [],
+			"pawns": []
+		};
+		let blackPieces = {
+			"queens": [],
+			"rooks": [],
+			"bishops": [],
+			"knights": [],
+			"pawns": []
+		};
+		for(var i = 0; i < this.capturedPieces.length; i++) {
+			let piece = this.capturedPieces[i];
+			let pieces = (piece.color == "w" ? whitePieces : blackPieces);
+			if(piece instanceof Queen) {
+				pieces.queens.push(piece);
+			} 
+			else if(piece instanceof Rook) {
+				pieces.rooks.push(piece);
+			} 
+			else if(piece instanceof Bishop) {
+				pieces.bishops.push(piece);
+			} 
+			else if(piece instanceof Knight) {
+				pieces.knights.push(piece);
+			} 
+			else if(piece instanceof Pawn) {
+				pieces.pawns.push(piece);
+			} 
+		}
+
+		$.each(whitePieces, function(key, pieces) {
+			if(pieces.length > 0) {
+				$("#w-pieces-captured").append("<div class='captured-box'>" + pieces[0].getIcon() + pieces.length + "</div>");
+			}
+		});
+
+		$.each(blackPieces, function(key, pieces) {
+			if(pieces.length > 0) {
+				$("#b-pieces-captured").append("<div class='captured-box'>" + pieces[0].getIcon() + pieces.length + "</div>");
+			}
 		});
 	}
 
@@ -103,11 +164,11 @@ class ChessBoard {
 		return (piece instanceof Pawn && (turn == "w" ? 0 : 7) == pos.y); //and is in the correct y pos
 	}
 
-	showPawnPromotion(pos, turn) {
-		$("#pawn-promotion").html(	"<img src='images/" + turn + "queen.png' onclick='promotePiece(\"queen\", \""+turn+"\", "+pos.x+", "+pos.y+")'>" +
-								  	"<img src='images/" + turn + "rook.png' onclick='promotePiece(\"rook\", \""+turn+"\", "+pos.x+", "+pos.y+")'>" +
-									"<img src='images/" + turn + "bishop.png' onclick='promotePiece(\"bishop\", \""+turn+"\", "+pos.x+", "+pos.y+")'>" +
-									"<img src='images/" + turn + "knight.png' onclick='promotePiece(\"knight\", \""+turn+"\", "+pos.x+", "+pos.y+")'>");
+	showPawnPromotion(from, pos, turn, captured) {
+		$("#pawn-promotion").html(	"<img src='images/" + turn + "queen.png' onclick='promotePiece(\"queen\", \""+turn+"\", "+from.x+", "+from.y+", "+pos.x+", "+pos.y+", "+captured+")'>" +
+								  	"<img src='images/" + turn + "rook.png' onclick='promotePiece(\"rook\", \""+turn+"\", "+from.x+", "+from.y+", "+pos.x+", "+pos.y+", "+captured+")'>" +
+									"<img src='images/" + turn + "bishop.png' onclick='promotePiece(\"bishop\", \""+turn+"\", "+from.x+", "+from.y+", "+pos.x+", "+pos.y+", "+captured+")'>" +
+									"<img src='images/" + turn + "knight.png' onclick='promotePiece(\"knight\", \""+turn+"\", "+from.x+", "+from.y+", "+pos.x+", "+pos.y+", "+captured+")'>");
 		$("#pawn-promotion").css("display", "flex");
 		this.showingPawnPromotion = true;
 	}
@@ -126,6 +187,8 @@ class ChessBoard {
 			this.board[newRookPos.y][newRookPos.x] = this.board[oldRookPos.y][oldRookPos.x];
 			this.board[oldRookPos.y][oldRookPos.x] = null;
 			this.board[newRookPos.y][newRookPos.x].moved = true;
+			
+			this.moves.addMove(from, to, this.pieceAtPos(newKingPos), null, true, null);
 			return this.nextTurn();
 		}
 		//for handling en passante in the next turn
@@ -140,14 +203,20 @@ class ChessBoard {
 			//check if pawn is an InvisiPawn™ to enforce en passante
 			if(capturedPiece instanceof InvisiPawn) {
 				let realPawnY = to.y + (capturedPiece.color == "w" ? -1 : 1);
+				capturedPiece = this.pieceAtPos({"x": to.x, "y": realPawnY});
 				this.board[realPawnY][to.x] = null;
 			}
+			//add piece to captured array
+			this.capturedPieces.push(capturedPiece);
 		}
 		this.board[to.y][to.x] = this.board[from.y][from.x];
 		this.board[from.y][from.x] = null;
 		this.board[to.y][to.x].moved = true;
 		if(this.isPawnPromotion(to, this.getTurn())) {
-			this.showPawnPromotion(to, this.getTurn());
+			this.showPawnPromotion(from, to, this.getTurn(), capturedPiece != null ? true : null);
+		}
+		else {
+			this.moves.addMove(from, to, this.pieceAtPos(to), capturedPiece, false, null);
 		}
 		return this.nextTurn();
 	}
@@ -367,8 +436,7 @@ function dropper(e, ui) {
 	}
 }
 
-function promotePiece(newPiece, turn, x, y) {
-	console.log(newPiece + ", " + turn + ", " + x + ", " + y);
+function promotePiece(newPiece, turn, fromX, fromY, x, y, captured) {
 	if(newPiece == "queen") {
 		board.board[y][x] = new Queen(turn);
 	}
@@ -381,6 +449,8 @@ function promotePiece(newPiece, turn, x, y) {
 	else if(newPiece == "knight") {
 		board.board[y][x] = new Knight(turn);
 	}
+	
+	board.moves.addMove({"x": fromX, "y": fromY}, {"x": x, "y": y}, new Pawn(), captured, false, board.board[y][x]);
 	board.drawBoard();
 	$("#pawn-promotion").css("display", "none");
 	board.showingPawnPromotion = false;
