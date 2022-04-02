@@ -307,7 +307,7 @@ class ChessBoard {
 				let newPos = {"x": x, "y": rooks[i].y};
 				let replaced = this.board[newPos.y][newPos.x];
 
-				if(this.pieceAtPos(pos) != null) {
+				if(this.pieceAtPos(newPos) != null) {
 					moveThroughCheck = true;
 				}
 				
