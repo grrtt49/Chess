@@ -99,6 +99,10 @@ h2 {
 	background-color: #B4522F !important;
 }
 
+.selected-move {
+	background-color: #B4522F;
+}
+
 .highlightPrev1 {
 	background-color: #F4F486 !important;
 }

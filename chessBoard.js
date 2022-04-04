@@ -126,7 +126,7 @@ class ChessBoard {
 		return false;
 	}
 
-	getColorArr() {
+	getColorArr(piece) {
 		//used for calculating where a piece can go (because a piece can take a piece of the opposite color)
 		var charArr = [];
 		for(var y = 0; y < 8; y++) {
@@ -136,7 +136,13 @@ class ChessBoard {
 					charArr[y].push(null);
 				}
 				else {
-					charArr[y].push(this.board[y][x].color);
+					//only apply en passant to pawns
+					if(!(piece instanceof Pawn) && this.board[y][x] instanceof InvisiPawn) {
+						charArr[y].push(null);
+					}
+					else {
+						charArr[y].push(this.board[y][x].color);
+					}
 				}
 			}
 		}
@@ -176,7 +182,7 @@ class ChessBoard {
 	}
 	
 	movePiece(from, to) {
-		this.moves.addMove(from, to, this.pieceAtPos(from), null, false, null, "", this.getAmbiguousness(from, to));
+		this.moves.addMove(from, to, this.pieceAtPos(from), null, false, null, "", this.getAmbiguousness(from, to), "");
 		if(this.isCastleMove(from, to)) {
 			var multiplier = (from.x - to.x > 0 ? -1 : 1);
 			let newKingPos = {"x": from.x + (2 * multiplier), "y": from.y};
@@ -205,7 +211,7 @@ class ChessBoard {
 		let capturedPiece = this.pieceAtPos(to);
 		if(capturedPiece != null) {
 			//check if pawn is an InvisiPawn™ to enforce en passante
-			if(capturedPiece instanceof InvisiPawn) {
+			if(this.pieceAtPos(from) instanceof Pawn && capturedPiece instanceof InvisiPawn) {
 				let realPawnY = to.y + (capturedPiece.color == "w" ? -1 : 1);
 				capturedPiece = this.pieceAtPos({"x": to.x, "y": realPawnY});
 				this.board[realPawnY][to.x] = null;
@@ -231,7 +237,7 @@ class ChessBoard {
 		if(piece == null) {
 			return [];
 		}
-		var available = piece.getAvailable(pos, this.getColorArr());
+		var available = piece.getAvailable(pos, this.getColorArr(piece));
 		if(piece instanceof King) {
 			var available = available.concat(this.getCastlingAvailable(pos));
 		}
@@ -292,6 +298,10 @@ class ChessBoard {
 			return this.turn == 1 ? "w" : "b";
 	}
 
+	setTurn(char) {
+		this.turn = (char == "w" ? 0 : 1);
+	}
+
 	nextTurn() {
 		this.turn = (this.turn + 1) % 2;
 		this.deleteInvisiPawns(this.getTurn());
@@ -301,10 +311,10 @@ class ChessBoard {
 	isCheck(side) {
 		var enemyMoves = [];
 		var kingPos;
-		let colorArr = this.getColorArr();
 
 		for(var y = 0; y < 8; y++) {
 			for(var x = 0; x < 8; x++) {
+				let colorArr = this.getColorArr(this.board[y][x]);
 				//find all the available spaces for enemy pieces (except pawns non-attacking moves)
 				if(this.board[y][x] != null && this.board[y][x].color != side) {
 					let checkPos = {"x": x, "y": y};
@@ -432,7 +442,7 @@ class ChessBoard {
 	}
 
 	getMostRecentMove() {
-		return this.moves.moves[this.moves.moves.length - 1];
+		return this.moves.moves[this.moves.currentMove];
 	}
 
 	getAmbiguousness(oldPos, newPos) {
@@ -488,6 +498,30 @@ class ChessBoard {
 		} 
 	}
 
+	createPieceFromStr(char) {
+		let color = (char == char.toUpperCase() ? "w" : "b");
+		char = char.toUpperCase();
+		
+		if(char == "P") {
+			return new Pawn(color);
+		}
+		else if(char == "N") {
+			return new Knight(color);
+		}
+		else if(char == "B") {
+			return new Bishop(color);
+		}
+		else if(char == "R") {
+			return new Rook(color);
+		}
+		else if(char == "Q") {
+			return new Queen(color);
+		}
+		else if(char == "K") {
+			return new King(color);
+		}
+	}
+
 	getFEN() {
 		var fenStr = "";
 		var spaces = 0;
@@ -527,8 +561,81 @@ class ChessBoard {
 		return fenStr;
 	}
 
-	setFEN() {
+	setFromFEN(fen) {
+		let colorIndex = fen.indexOf(" ") + 1;
+		//if indexof was not valid
+		if(colorIndex - 1 == -1) {
+			return false;
+		}
+		let enPassantIndex = fen.indexOf(" ", colorIndex + 1) + 1;
+		if(enPassantIndex - 1 == -1) {
+			return false;
+		}
+		let castleIndex = fen.indexOf(" ", enPassantIndex + 1) + 1;
+		if(castleIndex - 1 == -1) {
+			return false;
+		}
+		let halfmoveClockIndex = fen.indexOf(" ", castleIndex + 1) + 1;
+		if(halfmoveClockIndex - 1 == -1) {
+			return false;
+		}
+		let wholeMovesIndex = fen.indexOf(" ", halfmoveClockIndex + 1) + 1;
+		if(wholeMovesIndex - 1 == -1) {
+			return false;
+		}
+
+		let pieces = fen.substr(0, colorIndex - 1);
+		let color = fen.substr(colorIndex, enPassantIndex - colorIndex - 1);
+		let enPassant = fen.substr(enPassantIndex, castleIndex - enPassantIndex - 1);
+		let castle = fen.substr(castleIndex, halfmoveClockIndex - castleIndex - 1);
+		let halfmoveClock = fen.substr(halfmoveClockIndex, wholeMovesIndex - halfmoveClockIndex - 1);
+		let wholeMoves = fen.substr(wholeMovesIndex);
+
+		var x = 0;
+		var y = 0;
+		var newBoard = [[]];
+		for(let i = 0; i < pieces.length; i++) {
+			if(x > 8 || y > 8) return false;
+			
+			let checkChar = pieces.charAt(i);
+			//if char is number
+			if(!isNaN(checkChar)) {
+				for(var j = 0; j < parseInt(checkChar); j++) {
+					newBoard[y].push(null);
+				}
+				x += parseInt(checkChar);
+			}
+			else if(checkChar == "/"){
+				y++;
+				x = 0;
+				newBoard.push([]);
+			}
+			else {
+				newBoard[y].push(this.createPieceFromStr(checkChar));
+			}
+		}
+		this.board = newBoard;
+		this.setTurn(color);
+		if(enPassant != "-") {
+			//create an InvisiPawn™ with color opposite of whos turn it is
+			this.setInvisiPawnFromStr(enPassant, color == "w" ? "b" : "w");
+		}
 		
+		return true;
+	}
+
+	setInvisiPawnFromStr(str, color) {
+		if(str.length != 2) return;
+		let x = getKeyByValue(columns, str.charAt(0));
+		let y = 8 - parseInt(str.charAt(1));
+		this.board[y][x] = new InvisiPawn(color);
+	}
+
+	setFromMove(index) {
+		let newFEN = this.moves.setFromMove(index);
+		console.log("Setting fen: " + newFEN);
+		this.setFromFEN(newFEN);
+		this.drawBoard();
 	}
 }
 
@@ -567,6 +674,7 @@ function dropper(e, ui) {
 			$("img, .square").css("pointer-events", "none");
 		}
 
+		board.getMostRecentMove().fen = board.getFEN();
 		highlightPrevious();
 	}
 }
@@ -628,6 +736,7 @@ function promotePiece(newPiece, turn, fromX, fromY, x, y, captured) {
 		});
 		$("img, .square").css("pointer-events", "none");
 	}
+	board.getMostRecentMove().fen = board.getFEN();
 	
 	$("#pawn-promotion").css("display", "none");
 	board.showingPawnPromotion = false;

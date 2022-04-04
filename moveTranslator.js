@@ -1,26 +1,44 @@
 class MoveTranslator {
 	moves;
+	currentMove;
 	
 	constructor() {
 		this.moves = [];
-	}
-	
-	addMove(oldPos, newPos, piece, captured, castle, promote, check, ambiguous) {
-		this.moves.push(new Move(oldPos, newPos, piece, captured, castle, promote, check, ambiguous));
+		this.currentMove = -1;
 	}
 
+	addMove(oldPos, newPos, piece, captured, castle, promote, check, ambiguous, fen) {
+		console.log("length: " + (this.moves.length - 1) + ", current: " + this.currentMove);
+		if(this.currentMove != this.moves.length - 1) {
+			//for some reason sees it as a string??? need to parse it
+			this.resetFromMove(parseInt(this.currentMove) + 1);
+		}
+		this.moves.push(new Move(oldPos, newPos, piece, captured, castle, promote, check, ambiguous, fen));
+		this.currentMove = this.moves.length - 1;
+	}
+
+	//used when going back to a previous move. If another move is made during that, it will reset all moves after it
+	setFromMove(index) {
+		this.currentMove = index;
+		return this.moves[index].fen;
+	}
+	
 	resetFromMove(index) {
+		console.log(index);
 		this.moves.splice(index);
 	}
 
 	getHTML() {
 		var html = "";
 		for(let i = 0; i < this.moves.length; i += 2) {
-			html += "<div class='move-col-1'>" + Math.ceil((i + 1)/2) + "</div>" + 
-					"<div class='move-col-2'>" + this.moves[i].toString() + "</div>";
+			let selectedStr = (i == this.currentMove ? "selected-move" : "");  
+			
+			html += "<div class='move-col-1'>" + Math.ceil((i + 1)/2) + "</div>" +
+					"<div class='move-col-2 "+selectedStr+"' data-index='"+i+"'>" + this.moves[i].toString() + "</div>";
 
 			if(i + 1 < this.moves.length) {
-				html += "<div class='move-col-2'>" + this.moves[i + 1].toString() + "</div>";
+				let selectedStr = (i + 1 == this.currentMove ? "selected-move" : "");
+				html += "<div class='move-col-2 "+selectedStr+"' data-index='"+(i + 1)+"'>" + this.moves[i + 1].toString() + "</div>";
 			}
 		}
 		return html;
@@ -42,6 +60,14 @@ class MoveTranslator {
 	}
 }
 
+$(document).ready(function(){
+	$(document).on("click", ".move-col-2", function() {
+		let index = $(this).attr("data-index");
+		board.setFromMove(index);
+		highlightPrevious();
+	});
+});
+
 let columns = {
 	0: "a",
 	1: "b",
@@ -53,6 +79,10 @@ let columns = {
 	7: "h",
 };
 
+function getKeyByValue(object, value) {
+  return Object.keys(object).find(key => object[key] === value);
+}
+
 class Move {
 	oldPos;
 	newPos;
@@ -62,8 +92,9 @@ class Move {
 	promote;
 	check;
 	ambiguous;
+	fen;
 	
-	constructor(oldPos, newPos, piece, captured, castle, promote, check, ambiguous) {
+	constructor(oldPos, newPos, piece, captured, castle, promote, check, ambiguous, fen) {
 		this.oldPos = oldPos;
 		this.newPos = newPos;
 		this.piece = piece;
@@ -72,6 +103,7 @@ class Move {
 		this.promote = promote;
 		this.check = check;
 		this.ambiguous = ambiguous;
+		this.fen = fen;
 	}
 
 	toString() {
