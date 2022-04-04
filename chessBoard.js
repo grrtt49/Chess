@@ -442,6 +442,7 @@ class ChessBoard {
 	}
 
 	getMostRecentMove() {
+		if(this.moves.currentMove < 0) return null;
 		return this.moves.moves[this.moves.currentMove];
 	}
 
@@ -632,10 +633,13 @@ class ChessBoard {
 	}
 
 	setFromMove(index) {
-		let newFEN = this.moves.setFromMove(index);
-		console.log("Setting fen: " + newFEN);
-		this.setFromFEN(newFEN);
-		this.drawBoard();
+		let newBoardInfo = this.moves.setFromMove(index);
+		if(newBoardInfo != null && newBoardInfo.fen != null) {
+			this.setFromFEN(newBoardInfo.fen);
+			this.capturedPieces = newBoardInfo.capturedPieces;
+			this.drawBoard();
+			highlightPrevious();
+		}
 	}
 }
 
@@ -675,11 +679,13 @@ function dropper(e, ui) {
 		}
 
 		board.getMostRecentMove().fen = board.getFEN();
+		board.getMostRecentMove().capturedPieces = board.capturedPieces.slice();
 		highlightPrevious();
 	}
 }
 
 function highlightPrevious() {
+	if(board.getMostRecentMove() == null) return;
 	oldPos = board.getMostRecentMove().oldPos;
 	newPos = board.getMostRecentMove().newPos;
 
@@ -737,6 +743,7 @@ function promotePiece(newPiece, turn, fromX, fromY, x, y, captured) {
 		$("img, .square").css("pointer-events", "none");
 	}
 	board.getMostRecentMove().fen = board.getFEN();
+	board.getMostRecentMove().capturedPieces = board.capturedPieces.slice();
 	
 	$("#pawn-promotion").css("display", "none");
 	board.showingPawnPromotion = false;

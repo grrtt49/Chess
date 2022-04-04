@@ -8,7 +8,6 @@ class MoveTranslator {
 	}
 
 	addMove(oldPos, newPos, piece, captured, castle, promote, check, ambiguous, fen) {
-		console.log("length: " + (this.moves.length - 1) + ", current: " + this.currentMove);
 		if(this.currentMove != this.moves.length - 1) {
 			//for some reason sees it as a string??? need to parse it
 			this.resetFromMove(parseInt(this.currentMove) + 1);
@@ -19,17 +18,22 @@ class MoveTranslator {
 
 	//used when going back to a previous move. If another move is made during that, it will reset all moves after it
 	setFromMove(index) {
+		if(index >= this.moves.length) return null;
 		this.currentMove = index;
-		return this.moves[index].fen;
+		if(index < 0) return {"fen": this.getDefaultFEN(), "capturedPieces": []};
+		return {"fen": this.moves[index].fen, "capturedPieces": this.moves[index].capturedPieces};
 	}
 	
 	resetFromMove(index) {
-		console.log(index);
 		this.moves.splice(index);
 	}
 
+	getDefaultFEN() {
+		return "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w - KQkq 0 1";
+	}
+
 	getHTML() {
-		var html = "";
+		var html = this.getButtonRowHTML();
 		for(let i = 0; i < this.moves.length; i += 2) {
 			let selectedStr = (i == this.currentMove ? "selected-move" : "");  
 			
@@ -42,6 +46,10 @@ class MoveTranslator {
 			}
 		}
 		return html;
+	}
+
+	getButtonRowHTML() {
+		return "<div id='to-beginning-btn' class='btn-column no-select'>\u23EE</div><div id='prev-btn' class='btn-column no-select'>\u25C0</div><div id='next-btn' class='btn-column no-select'>\u25B6</div><div id='to-end-btn' class='btn-column no-select'>\u23ED</div><div id='share-btn' class='btn-column no-select'><img src='images/share.svg' style='margin-top: 5px; width:15px;'></div>";
 	}
 
 	getFullMovesCount() {
@@ -64,9 +72,36 @@ $(document).ready(function(){
 	$(document).on("click", ".move-col-2", function() {
 		let index = $(this).attr("data-index");
 		board.setFromMove(index);
-		highlightPrevious();
+	});
+
+	$(document).on("click", "#to-beginning-btn", function() {
+		board.setFromMove(-1);
+	});
+
+	$(document).on("click", "#to-end-btn", function() {
+		board.setFromMove(board.moves.moves.length - 1);
+	});
+
+	$(document).on("click", "#prev-btn", function() {
+		board.setFromMove(Math.max(-1, board.moves.currentMove - 1));
+	});
+
+	$(document).on("click", "#next-btn", function() {
+		board.setFromMove(board.moves.currentMove + 1);
+	});
+
+	$(document).on("click", "#share-btn", function() {
+		$("#share-fen").html("<span id='fen-text'>" + board.getFEN() + "</span><br><button onclick='copyToClipboard(\"#fen-text\"); $(this).text(\"Copied!\");'>Copy</button> <button onclick='$(\"#share-fen\").hide()'>Close</button>").show();
 	});
 });
+
+function copyToClipboard(element) {
+  var $temp = $("<input>");
+  $("body").append($temp);
+  $temp.val($(element).text()).select();
+  document.execCommand("copy");
+  $temp.remove();
+}
 
 let columns = {
 	0: "a",
@@ -93,6 +128,7 @@ class Move {
 	check;
 	ambiguous;
 	fen;
+	capturedPieces;
 	
 	constructor(oldPos, newPos, piece, captured, castle, promote, check, ambiguous, fen) {
 		this.oldPos = oldPos;
@@ -104,6 +140,7 @@ class Move {
 		this.check = check;
 		this.ambiguous = ambiguous;
 		this.fen = fen;
+		this.capturedPieces = {};
 	}
 
 	toString() {

@@ -54,6 +54,10 @@ h2 {
 	align-items: center;
 }
 
+#pieces-captured {
+	height: 50px;
+}
+
 .pieces-captured {
 	display: inline-block;
 }
@@ -73,12 +77,20 @@ h2 {
 	background-color: #555;
 	padding: 10px;
 	border-radius: 10px;
-	margin-top: 35px;
 	width: 460px;
 }
 
 #b-pieces-captured {
 	float: right;
+}
+
+#share-fen {
+	background-color: #555;
+	padding: 10px;
+	border-radius: 10px;
+	width: 460px;
+	margin-bottom: 10px;
+	font-family: Consolas;
 }
 
 .move-col-1 {
@@ -90,6 +102,31 @@ h2 {
 .move-col-2 {
 	width: 38%; 
 	padding: 5px;
+	cursor: pointer;
+}
+
+.btn-column {
+	flex-basis: 20%; 
+	background-color: #666;
+	padding: 5px 0 5px 0;
+	text-align: center;
+	cursor: pointer;
+}
+
+.btn-column:hover {
+	background-color: #606060;
+}
+
+.move-col-2:hover {
+	background-color: #606060;
+}
+
+.selected-move {
+	background-color: #B4522F;
+}
+
+.selected-move:hover {
+	background-color: #c95e34;
 }
 
 .square.selected1 {
@@ -97,10 +134,6 @@ h2 {
 }
 .square.selected2 {
 	background-color: #B4522F !important;
-}
-
-.selected-move {
-	background-color: #B4522F;
 }
 
 .highlightPrev1 {
