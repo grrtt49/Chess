@@ -172,8 +172,15 @@ class ChessBoard {
 		$("#pawn-promotion").css("display", "flex");
 		this.showingPawnPromotion = true;
 	}
+
+	getCheckStr() {
+		if(this.isCheckmate(this.getTurn(true))) return "checkmate";
+		if(this.isCheck(this.getTurn(true))) return "check";
+		return "";
+	}
 	
 	movePiece(from, to) {
+		this.moves.addMove(from, to, this.pieceAtPos(from), null, false, null, "", this.getAmbiguousness(from, to));
 		if(this.isCastleMove(from, to)) {
 			var multiplier = (from.x - to.x > 0 ? -1 : 1);
 			let newKingPos = {"x": from.x + (2 * multiplier), "y": from.y};
@@ -187,8 +194,9 @@ class ChessBoard {
 			this.board[newRookPos.y][newRookPos.x] = this.board[oldRookPos.y][oldRookPos.x];
 			this.board[oldRookPos.y][oldRookPos.x] = null;
 			this.board[newRookPos.y][newRookPos.x].moved = true;
-			
-			this.moves.addMove(from, to, this.pieceAtPos(newKingPos), null, true, null);
+
+			this.getMostRecentMove().castle = true;
+			this.deleteInvisiPawns(this.getTurn(true));
 			return this.nextTurn();
 		}
 		//for handling en passante in the next turn
@@ -208,7 +216,9 @@ class ChessBoard {
 			}
 			//add piece to captured array
 			this.capturedPieces.push(capturedPiece);
+			this.getMostRecentMove().captured = capturedPiece;
 		}
+		
 		this.board[to.y][to.x] = this.board[from.y][from.x];
 		this.board[from.y][from.x] = null;
 		this.board[to.y][to.x].moved = true;
@@ -216,9 +226,8 @@ class ChessBoard {
 			this.showPawnPromotion(from, to, this.getTurn(), capturedPiece != null ? true : null);
 		}
 		else {
-			this.moves.addMove(from, to, this.pieceAtPos(to), capturedPiece, false, null);
+			return this.nextTurn();
 		}
-		return this.nextTurn();
 	}
 
 	getAvailableAtPos(pos) {
@@ -311,7 +320,6 @@ class ChessBoard {
 				}
 			}
 		}
-
 		//if the king's position is in any of the attacking squares, return true
 		return this._includesPosInArray(kingPos, enemyMoves);
 	}
@@ -349,14 +357,35 @@ class ChessBoard {
 
 	getUnmovedRooksPos(side) {
 		var rooks = [];
-		for(var y = 0; y < 8; y++) {
-			for(var x = 0; x < 8; x++) {
+		for(var y = 7; y >= 0; y--) {
+			for(var x = 7; x >= 0; x--) {
 				if(this.board[y][x] != null && this.board[y][x].color == side && this.board[y][x] instanceof Rook && this.board[y][x].moved == false) {
 					rooks.push({"x": x, "y": y});
 				}
 			}
 		}
 		return rooks;
+	}
+
+	getCastleStr() {
+		let colors = ["w", "b"];
+		var castleStr = "";
+		for(let i = 0; i < colors.length; i++) {
+			let kingPos = this.getKingPos(colors[i]);
+			let king = this.pieceAtPos(kingPos); 
+			if(king == null || king.moved) continue;
+			
+			let unmovedRooks = this.getUnmovedRooksPos(colors[i]);
+			for(var x = 0; x < unmovedRooks.length; x++) {
+				if(unmovedRooks[x].x == 7) {
+					castleStr += (colors[i] == "w" ? "K" : "k");
+				}
+				if(unmovedRooks[x].x == 0) {
+					castleStr += (colors[i] == "w" ? "Q" : "q");
+				}
+			}
+		}
+		return (castleStr == "" ? "-" : castleStr);
 	}
 
 	getCastlingAvailable(pos) {
@@ -405,6 +434,106 @@ class ChessBoard {
 		}
 		return castlePositions;
 	}
+
+	getMostRecentMove() {
+		return this.moves.moves[this.moves.moves.length - 1];
+	}
+
+	getAmbiguousness(oldPos, newPos) {
+		let piece = this.pieceAtPos(oldPos); 
+		let side = piece.color;
+		var rankSame = false;
+		var fileSame = false;
+
+		for(var y = 0; y < 8; y++) {
+			for(var x = 0; x < 8; x++) {
+				//skip the piece we are finding ambiguousness for
+				if(x == oldPos.x && y == oldPos.y) continue;
+				
+				let checkPos = {"x": x, "y": y};
+				let checkPiece = this.pieceAtPos(checkPos);
+				//check if piece is same type as original piece
+				if(checkPiece != null && checkPiece.color == side && checkPiece.constructor === piece.constructor) {
+					//if piece has new pos as an available position, set return ambiguous accordingly.
+					let available = this.getAvailableAtPos(checkPos);
+					if(this._includesPosInArray(newPos, available)) {
+						if(oldPos.y == checkPos.y) {
+							fileSame = true;
+						}
+						if(oldPos.x == checkPos.x) {
+							rankSame = true;
+						}
+					}
+					
+				}
+			}
+		}
+		return (fileSame ? "f" : "") + (rankSame ? "r" : "");
+	}
+
+	getPieceStr(piece) {
+		if(piece instanceof Pawn) {
+			return "P";
+		}
+		else if(piece instanceof Knight) {
+			return "N";
+		} 
+		else if(piece instanceof Bishop) {
+			return "B";
+		} 
+		else if(piece instanceof Rook) {
+			return "R";
+		} 
+		else if(piece instanceof Queen) {
+			return "Q";
+		} 
+		else if(piece instanceof King) {
+			return "K";
+		} 
+	}
+
+	getFEN() {
+		var fenStr = "";
+		var spaces = 0;
+		var invisiPawnPos = null;
+		for(var y = 0; y < 8; y++) {
+			for(var x = 0; x < 8; x++) {
+				let piece = this.board[y][x];
+				if(piece != null && !(piece instanceof InvisiPawn)) {
+					if(spaces > 0) {
+						fenStr += spaces;
+						spaces = 0;
+					}
+					let pieceChar = this.getPieceStr(piece);
+					fenStr += (piece.color == "b" ? pieceChar.toLowerCase() : pieceChar);
+				}
+				else {
+					if(piece != null && piece instanceof InvisiPawn) {
+						invisiPawnPos = {"x": x, "y": y};
+					}
+					spaces++;
+				}
+			}
+			if(spaces > 0) {
+				fenStr += spaces;
+				spaces = 0;
+			}
+			if(y != 7) {
+				fenStr += "/"; 
+			}
+		}
+
+		fenStr += " " + this.getTurn();
+		fenStr += " " + (invisiPawnPos == null ? "-" : columns[invisiPawnPos.x] + (8 - invisiPawnPos.y));
+		fenStr += " " + this.getCastleStr();
+		fenStr += " " + this.moves.getHalfmoveClock();
+		fenStr += " " + this.moves.getFullMovesCount();
+		return fenStr;
+	}
+
+	setFEN() {
+		
+	}
 }
 
 function dropper(e, ui) {
@@ -419,15 +548,23 @@ function dropper(e, ui) {
 	//ensure movement is valid, then update
 	if(board.validateMove(oldPos, newPos)) {
 		let isCheckmate = board.movePiece(oldPos, newPos);
+		let isCheck = board.isCheck(board.getTurn());
+
+		if(isCheck) {
+			board.getMostRecentMove().check = "check";
+		}
+		if(isCheckmate) {
+			board.getMostRecentMove().check = "checkmate";
+		}
+
 		board.drawBoard();
 		
-		if(isCheckmate || board.isCheck(board.getTurn())) {
+		if(isCheckmate || isCheck) {
 			let kingPos = board.getKingPos(board.getTurn());
 			$(".pos" + kingPos.x + "-" + kingPos.y).addClass("check-square");
 		}
 
 		if(isCheckmate) {
-			console.log("checkmate bois");
 			$(".draggable").draggable({
 				disabled: true
 			});
@@ -449,9 +586,32 @@ function promotePiece(newPiece, turn, fromX, fromY, x, y, captured) {
 	else if(newPiece == "knight") {
 		board.board[y][x] = new Knight(turn);
 	}
-	
-	board.moves.addMove({"x": fromX, "y": fromY}, {"x": x, "y": y}, new Pawn(), captured, false, board.board[y][x]);
+
+	let isCheckmate = board.nextTurn();
+	let isCheck = board.isCheck(board.getTurn());
+
+	board.getMostRecentMove().promote = board.board[y][x];
+	if(isCheck) {
+		board.getMostRecentMove().check = "check";
+	}
+	if(isCheckmate) {
+		board.getMostRecentMove().check = "checkmate";
+	}
+
 	board.drawBoard();
+	
+	if(isCheckmate || isCheck) {
+		let kingPos = board.getKingPos(board.getTurn());
+		$(".pos" + kingPos.x + "-" + kingPos.y).addClass("check-square");
+	}
+
+	if(isCheckmate) {
+		$(".draggable").draggable({
+			disabled: true
+		});
+		$("img, .square").css("pointer-events", "none");
+	}
+	
 	$("#pawn-promotion").css("display", "none");
 	board.showingPawnPromotion = false;
 }

@@ -5,8 +5,8 @@ class MoveTranslator {
 		this.moves = [];
 	}
 	
-	addMove(oldPos, newPos, piece, captured, castle, promote) {
-		this.moves.push(new Move(oldPos, newPos, piece, captured, castle, promote));
+	addMove(oldPos, newPos, piece, captured, castle, promote, check, ambiguous) {
+		this.moves.push(new Move(oldPos, newPos, piece, captured, castle, promote, check, ambiguous));
 	}
 
 	resetFromMove(index) {
@@ -24,6 +24,21 @@ class MoveTranslator {
 			}
 		}
 		return html;
+	}
+
+	getFullMovesCount() {
+		return Math.ceil((this.moves.length + 1) / 2);
+	}
+
+	getHalfmoveClock() {
+		var count = 0;
+		for(let i = this.moves.length - 1; i >= 0; i--) {
+			if(this.moves[i].piece instanceof Pawn || this.moves[i].captured != null) {
+				return count;
+			}
+			count++;
+		}
+		return count;
 	}
 }
 
@@ -45,14 +60,18 @@ class Move {
 	captured;
 	castle;
 	promote;
+	check;
+	ambiguous;
 	
-	constructor(oldPos, newPos, piece, captured, castle, promote) {
+	constructor(oldPos, newPos, piece, captured, castle, promote, check, ambiguous) {
 		this.oldPos = oldPos;
 		this.newPos = newPos;
 		this.piece = piece;
 		this.captured = captured;
 		this.castle = castle;
 		this.promote = promote;
+		this.check = check;
+		this.ambiguous = ambiguous;
 	}
 
 	toString() {
@@ -60,13 +79,26 @@ class Move {
 			if(this.newPos.x == 2) return "0-0-0";
 			return "0-0";
 		}
-		var str = this.getCapturedStr() + this.getPieceStr(this.piece) + columns[this.newPos.x] + (this.newPos.y + 1) + this.promoteString();
+		var str = this.getAmbiguousPieceStr(this.piece) + this.getCapturedStr() + columns[this.newPos.x] + (8 - this.newPos.y) + this.promoteString() + this.checkString();
 		return str;
+	}
+
+	getAmbiguousPieceStr(piece) {
+		let pieceStr = this.getPieceStr(this.piece);
+		let columnStr = columns[this.oldPos.x];
+		if(this.piece instanceof Pawn) {
+			columnStr = "";
+			pieceStr = "";
+		}
+		if(this.ambiguous == "") return pieceStr;
+		if(this.ambiguous == "f") return pieceStr + columnStr;
+		if(this.ambiguous == "r") return pieceStr + (8 - this.oldPos.y);
+		if(this.ambiguous == "fr") return pieceStr + columnStr + (8 - this.oldPos.y);
 	}
 
 	getPieceStr(piece) {
 		if(piece instanceof Pawn) {
-			return "";
+			return columns[this.oldPos.x];
 		}
 		else if(piece instanceof Knight) {
 			return "N";
@@ -87,11 +119,18 @@ class Move {
 
 	getCapturedStr() {
 		if(this.captured == null) return "";
-		return columns[this.oldPos.x] + "x";
+		if(this.piece instanceof Pawn) return this.getPieceStr(this.piece) + "x";
+		return "x";
 	}
 
 	promoteString() {
 		if(this.promote == null) return "";
 		return this.getPieceStr(this.promote);
+	}
+
+	checkString() {
+		if(this.check == "") return "";
+		if(this.check == "check") return "+";
+		if(this.check == "checkmate") return "#";
 	}
 }
