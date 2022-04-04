@@ -6,19 +6,15 @@ Check after pawn promotion
 class ChessBoard {
 	selector;
 	size;
-	color1;
-	color2;
 	board;
 	turn;
 	showingPawnPromotion;
 	capturedPieces;
 	moves;
 	
-	constructor(selector, size, color1, color2) {
+	constructor(selector, size) {
 	    this.selector = selector;
 		this.size = size;
-		this.color1 = color1;
-		this.color2 = color2;
 		this.board = this._initBoard();
 		this.turn = 0;
 		this.showingPawnPromotion = false;
@@ -95,13 +91,13 @@ class ChessBoard {
 
 	_getSquare(x, y) {
 		//gets the html for a square at position x, y
-		var color = this.color1;
+		var color = 1;
 		if(x % 2 != y % 2) {
-			color = this.color2;
+			color = 2;
 		}
 		let piece = this.board[y][x];
 		let pieceImg = (piece != null ? piece.getPiece() : "");
-		return $("<div class='square pos" + x + "-" + y + "' data-x='" + x + "' data-y='" + y + "' style='width: " + this.size + "px; height: " + this.size + "px; background-color: " + color + "'>" + pieceImg + "</div>").droppable({
+		return $("<div class='square color" + color + " pos" + x + "-" + y + "' data-x='" + x + "' data-y='" + y + "' style='width: " + this.size + "px; height: " + this.size + "px;'>" + pieceImg + "</div>").droppable({
 			drop: dropper
 		});
 	}
@@ -570,6 +566,27 @@ function dropper(e, ui) {
 			});
 			$("img, .square").css("pointer-events", "none");
 		}
+
+		highlightPrevious();
+	}
+}
+
+function highlightPrevious() {
+	oldPos = board.getMostRecentMove().oldPos;
+	newPos = board.getMostRecentMove().newPos;
+
+	if(oldPos.x % 2 == oldPos.y % 2) {
+		$(".pos" + oldPos.x + "-" + oldPos.y).addClass("highlightPrev1");
+	}
+	else {
+		$(".pos" + oldPos.x + "-" + oldPos.y).addClass("highlightPrev2");
+	}
+
+	if(newPos.x % 2 == newPos.y % 2) {
+		$(".pos" + newPos.x + "-" + newPos.y).addClass("highlightPrev1");
+	}
+	else {
+		$(".pos" + newPos.x + "-" + newPos.y).addClass("highlightPrev2");
 	}
 }
 

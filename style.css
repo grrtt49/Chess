@@ -28,11 +28,6 @@ h2 {
 .square {
 	display: inline-block;
 }
-
-.hilighted {
-	box-shadow: 0px 0px 0px 5px inset #ffff11;
-}
-
 .check-square {
 	box-shadow: 0px 0px 0px 5px inset #cd1212;
 }
@@ -95,4 +90,26 @@ h2 {
 .move-col-2 {
 	width: 38%; 
 	padding: 5px;
+}
+
+.square.selected1 {
+	background-color: #F68273 !important;
+}
+.square.selected2 {
+	background-color: #B4522F !important;
+}
+
+.highlightPrev1 {
+	background-color: #F4F486 !important;
+}
+.highlightPrev2 {
+	background-color: #A8BC37 !important;
+}
+
+.color1 {
+	background-color: #eeeed2;
+}
+
+.color2 {
+	background-color: #769656;
 }
