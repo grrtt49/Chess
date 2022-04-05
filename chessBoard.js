@@ -6,13 +6,14 @@ Check after pawn promotion
 class ChessBoard {
 	selector;
 	size;
+	timerManager;
 	board;
 	turn;
 	showingPawnPromotion;
 	capturedPieces;
 	moves;
 	
-	constructor(selector, size) {
+	constructor(selector, size, minutes, increment) {
 	    this.selector = selector;
 		this.size = size;
 		this.board = this._initBoard();
@@ -20,6 +21,15 @@ class ChessBoard {
 		this.showingPawnPromotion = false;
 		this.capturedPieces = [];
 		this.moves = new MoveTranslator();
+		
+		if(minutes != undefined && increment != undefined) {
+			this.timerManager = new ChessTimerManager(minutes, increment);
+			this.timerManager.startTimer("w", false);
+			$("#timer-container").show();
+		}
+		else {
+			this.timerManager = null;
+		}
 	}
 
 	drawBoard() {
@@ -188,7 +198,7 @@ class ChessBoard {
 			let newKingPos = {"x": from.x + (2 * multiplier), "y": from.y};
 			let oldRookPos = {"x": (multiplier == -1 ? 0 : 7), "y": from.y};
 			let newRookPos = {"x": newKingPos.x + (multiplier * -1), "y": from.y};
-			
+			console.log("castling");
 			this.board[newKingPos.y][newKingPos.x] = this.board[from.y][from.x];
 			this.board[from.y][from.x] = null;
 			this.board[newKingPos.y][newKingPos.x].moved = true;
@@ -270,6 +280,11 @@ class ChessBoard {
 			return false;
 		}
 
+		//if this isn't the most recent move (they are looking at a previous move)
+		if(this.moves.currentMove != this.moves.moves.length - 1) {
+			return false;
+		}
+
 		//get available spaces and ensure the new position is included
 		let availableSpaces = this.getAvailableAtPos(oldPos);
 		return this._includesPosInArray(newPos, availableSpaces);
@@ -305,6 +320,9 @@ class ChessBoard {
 	nextTurn() {
 		this.turn = (this.turn + 1) % 2;
 		this.deleteInvisiPawns(this.getTurn());
+		if(this.timerManager != null) {
+			this.timerManager.startTimer(this.getTurn());
+		}
 		return this.isCheckmate(this.getTurn());
 	}
 
@@ -555,8 +573,8 @@ class ChessBoard {
 		}
 
 		fenStr += " " + this.getTurn();
-		fenStr += " " + (invisiPawnPos == null ? "-" : columns[invisiPawnPos.x] + (8 - invisiPawnPos.y));
 		fenStr += " " + this.getCastleStr();
+		fenStr += " " + (invisiPawnPos == null ? "-" : columns[invisiPawnPos.x] + (8 - invisiPawnPos.y));
 		fenStr += " " + this.moves.getHalfmoveClock();
 		fenStr += " " + this.moves.getFullMovesCount();
 		return fenStr;
@@ -564,31 +582,15 @@ class ChessBoard {
 
 	setFromFEN(fen) {
 		let colorIndex = fen.indexOf(" ") + 1;
-		//if indexof was not valid
-		if(colorIndex - 1 == -1) {
-			return false;
-		}
-		let enPassantIndex = fen.indexOf(" ", colorIndex + 1) + 1;
-		if(enPassantIndex - 1 == -1) {
-			return false;
-		}
-		let castleIndex = fen.indexOf(" ", enPassantIndex + 1) + 1;
-		if(castleIndex - 1 == -1) {
-			return false;
-		}
+		let castleIndex = fen.indexOf(" ", colorIndex + 1) + 1;
+		let enPassantIndex = fen.indexOf(" ", castleIndex + 1) + 1;
 		let halfmoveClockIndex = fen.indexOf(" ", castleIndex + 1) + 1;
-		if(halfmoveClockIndex - 1 == -1) {
-			return false;
-		}
 		let wholeMovesIndex = fen.indexOf(" ", halfmoveClockIndex + 1) + 1;
-		if(wholeMovesIndex - 1 == -1) {
-			return false;
-		}
 
 		let pieces = fen.substr(0, colorIndex - 1);
-		let color = fen.substr(colorIndex, enPassantIndex - colorIndex - 1);
-		let enPassant = fen.substr(enPassantIndex, castleIndex - enPassantIndex - 1);
-		let castle = fen.substr(castleIndex, halfmoveClockIndex - castleIndex - 1);
+		let color = fen.substr(colorIndex, castleIndex - colorIndex - 1);
+		let castle = fen.substr(castleIndex, enPassantIndex - castleIndex - 1);
+		let enPassant = fen.substr(enPassantIndex, halfmoveClockIndex - enPassantIndex - 1);
 		let halfmoveClock = fen.substr(halfmoveClockIndex, wholeMovesIndex - halfmoveClockIndex - 1);
 		let wholeMoves = fen.substr(wholeMovesIndex);
 
