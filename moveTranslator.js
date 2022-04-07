@@ -1,10 +1,13 @@
 class MoveTranslator {
 	moves;
 	currentMove;
+	startFEN;
+	completedString;
 	
 	constructor() {
 		this.moves = [];
 		this.currentMove = -1;
+		this.completedString = "";
 	}
 
 	addMove(oldPos, newPos, piece, captured, castle, promote, check, ambiguous, fen) {
@@ -20,8 +23,8 @@ class MoveTranslator {
 	setFromMove(index) {
 		if(index >= this.moves.length) return null;
 		this.currentMove = index;
-		if(index < 0) return {"fen": this.getDefaultFEN(), "capturedPieces": []};
-		return {"fen": this.moves[index].fen, "capturedPieces": this.moves[index].capturedPieces};
+		if(index < 0) return {"fen": this.getDefaultFEN(), "capturedPieces": [], "check":"find"};
+		return {"fen": this.moves[index].fen, "capturedPieces": this.moves[index].capturedPieces, "check": this.moves[index].check};
 	}
 	
 	resetFromMove(index) {
@@ -29,7 +32,10 @@ class MoveTranslator {
 	}
 
 	getDefaultFEN() {
-		return "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w - KQkq 0 1";
+		if(this.startFEN == null || this.startFEN == "") 
+			return "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w - KQkq 0 1";
+		
+		return this.startFEN
 	}
 
 	getHTML() {
@@ -44,6 +50,9 @@ class MoveTranslator {
 				let selectedStr = (i + 1 == this.currentMove ? "selected-move" : "");
 				html += "<div class='move-col-2 "+selectedStr+"' data-index='"+(i + 1)+"'>" + this.moves[i + 1].toString() + "</div>";
 			}
+		}
+		if(this.completedString != "") {
+			html += "<div class='result-column'>" + this.completedString + "</div>";
 		}
 		return html;
 	}
@@ -70,7 +79,7 @@ class MoveTranslator {
 
 $(document).ready(function(){
 	$(document).on("click", ".move-col-2", function() {
-		let index = $(this).attr("data-index");
+		let index = parseInt($(this).attr("data-index"));
 		board.setFromMove(index);
 	});
 

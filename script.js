@@ -1,8 +1,18 @@
-//var piece = new ChessPiece("#board", "/images/bking.png");
 var board = null;
+
 function startGame() {
 	let gameOption = $("#game-option").val();
 	let timeOption = $("#time-option").val();
+	let newFEN = $("#start-fen-input").val();
+	
+	if(gameOption == "custom" && !validateFEN(newFEN)) {
+		$("#start-fen-input")
+			.css("outline", "1px solid red")
+			.css("box-shadow", "0px 0px 10px red")
+		return;
+	}
+	
+	playStartSound();
 
 	if(timeOption == "real-time") {
 		let minutes = $("#minuteRange").val();
@@ -14,16 +24,18 @@ function startGame() {
 	}
 
 	if(gameOption == "custom") {
-		let newFEN = $("#start-fen-input").val();
-		if(validateFEN(newFEN)) {
-			console.log("Valid FEN");
-			board.setFromFEN(newFEN);
-		}
+		board.moves.startFEN = newFEN;
+		board.setFromFEN(newFEN);
 	}
 
 	$("#options_container").hide();
 	$("#chess-container").show();
 	board.drawBoard();
+
+	if(gameOption == "custom" && board.isCheck(board.getTurn())) {
+		let kingPos = board.getKingPos(board.getTurn());
+		$(".pos" + kingPos.x + "-" + kingPos.y).addClass("check-square");
+	}
 }
 
 $(document).ready(function() {
@@ -75,10 +87,13 @@ $(document).ready(function() {
 			$(".slidecontainer").hide();
 		}
 	});
+
+	$("#start-fen-input").on("input", function(){
+		$(this).css("outline", "").css("box-shadow", "");
+	});
 });
 
 function validateFEN(fen) {
-	console.log("Validating FEN");
 	const regexp = /\s*([rnbqkpRNBQKP1-8]+\/){7}([rnbqkpRNBQKP1-8]+)\s[bw-]\s(([a-hkqA-HKQ]{1,4})|(-))\s(([a-h][36])|(-))\s\d+\s\d+\s*/;
 	if(!fen.match(regexp)) return false;		   
 	

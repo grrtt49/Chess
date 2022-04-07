@@ -1,6 +1,10 @@
 /* 
 TODO: 
-Check after pawn promotion
+handle draws
+50 move rule
+3 repitition rule
+dead position: K v k, K and B v k, K and N vs k, K and B vs K and B of same color
+other variants
 */
 
 class ChessBoard {
@@ -198,7 +202,7 @@ class ChessBoard {
 			let newKingPos = {"x": from.x + (2 * multiplier), "y": from.y};
 			let oldRookPos = {"x": (multiplier == -1 ? 0 : 7), "y": from.y};
 			let newRookPos = {"x": newKingPos.x + (multiplier * -1), "y": from.y};
-			console.log("castling");
+			
 			this.board[newKingPos.y][newKingPos.x] = this.board[from.y][from.x];
 			this.board[from.y][from.x] = null;
 			this.board[newKingPos.y][newKingPos.x].moved = true;
@@ -208,7 +212,9 @@ class ChessBoard {
 			this.board[newRookPos.y][newRookPos.x].moved = true;
 
 			this.getMostRecentMove().castle = true;
+			this.getMostRecentMove().check = this.getCheckStr();
 			this.deleteInvisiPawns(this.getTurn(true));
+			playChessPieceSound();
 			return this.nextTurn();
 		}
 		//for handling en passante in the next turn
@@ -229,6 +235,10 @@ class ChessBoard {
 			//add piece to captured array
 			this.capturedPieces.push(capturedPiece);
 			this.getMostRecentMove().captured = capturedPiece;
+			playPieceTakesSound();
+		}
+		else {
+			playChessPieceSound();
 		}
 		
 		this.board[to.y][to.x] = this.board[from.y][from.x];
@@ -420,6 +430,8 @@ class ChessBoard {
 		let rooks = this.getUnmovedRooksPos(side);
 		
 		if(rooks.length == 0) return [];
+
+		if(this.isCheck(side)) return [];
 
 		var castlePositions = [];
 		for(var i = 0; i < rooks.length; i++) {
@@ -641,7 +653,42 @@ class ChessBoard {
 			this.capturedPieces = newBoardInfo.capturedPieces;
 			this.drawBoard();
 			highlightPrevious();
+
+			if(newBoardInfo.check == "find") {
+				if(this.isCheck(this.getTurn())) {
+					let kingPos = this.getKingPos(this.getTurn());
+					$(".pos" + kingPos.x + "-" + kingPos.y).addClass("check-square");
+				}
+				return;
+			}
+			
+			if(newBoardInfo.check != "") {
+				let kingPos = board.getKingPos(board.getTurn());
+				$(".pos" + kingPos.x + "-" + kingPos.y).addClass("check-square");
+			}
 		}
+	}
+
+	isDraw(toPlay) {
+		if(this.isCheck(toPlay)) return false;
+		//if side has no available moves, but is not in check, it is a draw
+		return !this.sideHasAvailableMoves(toPlay);
+	}
+
+	getCompletedStr() {
+		if(this.isDraw(this.getTurn())) return "\u00BD - \u00BD";
+		if(this.isCheckmate(this.getTurn())) { 
+			return this.getWinnerStr(this.getTurn());
+		};
+		return "";
+	}
+
+	getWinnerStr(turn) {
+		if(turn == "w")
+			return "0 - 1";
+		else
+			return "1 - 0";
+		return "";
 	}
 }
 
@@ -658,6 +705,7 @@ function dropper(e, ui) {
 	if(board.validateMove(oldPos, newPos)) {
 		let isCheckmate = board.movePiece(oldPos, newPos);
 		let isCheck = board.isCheck(board.getTurn());
+		let isDraw = board.isDraw(board.getTurn());
 
 		if(isCheck) {
 			board.getMostRecentMove().check = "check";
@@ -666,6 +714,7 @@ function dropper(e, ui) {
 			board.getMostRecentMove().check = "checkmate";
 		}
 
+		board.moves.completedString = board.getCompletedStr();
 		board.drawBoard();
 		
 		if(isCheckmate || isCheck) {
@@ -673,11 +722,12 @@ function dropper(e, ui) {
 			$(".pos" + kingPos.x + "-" + kingPos.y).addClass("check-square");
 		}
 
-		if(isCheckmate) {
+		if(isCheckmate || isDraw) {
 			$(".draggable").draggable({
 				disabled: true
 			});
 			$("img, .square").css("pointer-events", "none");
+			playEndSound();
 		}
 
 		board.getMostRecentMove().fen = board.getFEN();
@@ -731,6 +781,7 @@ function promotePiece(newPiece, turn, fromX, fromY, x, y, captured) {
 		board.getMostRecentMove().check = "checkmate";
 	}
 
+	board.moves.completedString = board.getCompletedStr();
 	board.drawBoard();
 	
 	if(isCheckmate || isCheck) {
@@ -743,10 +794,29 @@ function promotePiece(newPiece, turn, fromX, fromY, x, y, captured) {
 			disabled: true
 		});
 		$("img, .square").css("pointer-events", "none");
+		playEndSound();
 	}
 	board.getMostRecentMove().fen = board.getFEN();
 	board.getMostRecentMove().capturedPieces = board.capturedPieces.slice();
 	
 	$("#pawn-promotion").css("display", "none");
 	board.showingPawnPromotion = false;
+}
+
+function boardEndTimer(selector) {
+	console.log("Ended!");
+	let color = "b";
+	if(selector == "#white-timer") {
+		color = "w";
+	}
+
+	board.moves.completedString = board.getWinnerStr(color);
+	board.drawBoard();
+	
+	$(".draggable").draggable({
+		disabled: true
+	});
+	$("img, .square").css("pointer-events", "none");
+	$(selector).css("background-color", "#B4522F")
+	playEndSound();
 }

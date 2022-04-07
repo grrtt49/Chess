@@ -4,6 +4,7 @@ class ChessTimer {
 	seconds;
 	increment;
 	timer;
+	ended;
 	
 	constructor(selector, minutes, increment) {
 	    this.selector = selector;
@@ -11,6 +12,7 @@ class ChessTimer {
 		this.seconds = 0;
 		this.increment = increment;
 		this.timer = null;
+		this.ended = false;
 	}
 
 	startTimer() {
@@ -22,6 +24,12 @@ class ChessTimer {
 		clearInterval(this.timer);
 	}
 
+	timerEnd() {
+		this.pauseTimer();
+		this.ended = true;
+		boardEndTimer(this.selector);
+	}
+
 	decrementTimer() {
 		this.seconds--;
 		if(this.seconds < 0) {
@@ -29,10 +37,9 @@ class ChessTimer {
 			this.seconds = 59;
 		}
 		if(this.minutes == 0 && this.seconds == 0) {
-			this.pauseTimer();
+			this.timerEnd();
 		}
 		this.drawTimer();
-		//console.log(this.getTimerText());
 	}
 
 	getTimerText() {
